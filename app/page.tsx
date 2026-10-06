@@ -1,0 +1,4 @@
+import Link from 'next/link';
+export default function Home() {
+  return <main className="entry-shell"><div className="brand"><span className="brand-mark">C</span><span>classroll</span></div><div className="entry-card"><p className="eyebrow">ATTENDANCE, WITHOUT THE PAPER TRAIL</p><h1>Check in to class.</h1><p className="muted">Scan the QR code shown by your teacher, then enter your roll number and private PIN. Your confirmation appears instantly.</p><div className="entry-actions"><Link className="button primary" href="/check-in">Student check-in</Link><Link className="button outline" href="/teacher">Teacher workspace</Link></div><p className="entry-note">A QR code is valid only while today’s session is open. Ask your teacher for help if your phone or internet is unavailable.</p></div><footer>Classroll · A clear record for every class</footer></main>
+}
