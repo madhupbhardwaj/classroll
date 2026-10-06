@@ -37,3 +37,7 @@ A student who shares both a live QR link and their PIN can still ask someone els
 ## Limits and operations
 
 The first installation starts with an empty roster. Back up the Neon database according to your school’s retention policy. Anyone with the public Vercel URL can see the student check-in form, while teacher actions require a teacher account. Only invite trusted teachers: every teacher currently has access to all classes in this installation.
+
+## Archive update for an existing database
+
+Before deploying the updated code, run `db/archive-migration.sql` in the Neon SQL Editor. Archive hides a class or student without deleting attendance records. Teachers can restore them from the dashboard. Archiving an active class closes its attendance session; restoring it does not reopen that session.
