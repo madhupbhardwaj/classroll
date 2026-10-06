@@ -35,3 +35,7 @@ CREATE TABLE IF NOT EXISTS attendance (
  method TEXT NOT NULL, checked_at BIGINT NOT NULL, note TEXT,
  UNIQUE(session_id, student_id)
 );
+
+-- Safe to run on an existing database. Archive timestamps preserve historical attendance.
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS archived_at BIGINT;
+ALTER TABLE students ADD COLUMN IF NOT EXISTS archived_at BIGINT;
