@@ -24,3 +24,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 .archive-row{font-size:.88rem}.notice{border:1px solid #dce8fb}.notice.error{border-color:#f3d5d9}.notice.success{border-color:#ccebdc}.detail-backdrop{backdrop-filter:blur(3px)}.detail-card{box-shadow:0 24px 70px rgba(13,30,60,.22)}
 @media(max-width:800px){.workspace{padding-top:26px}.page-head{margin-bottom:22px}.panel{padding:19px}.stats{gap:8px}.stat{min-width:100px;padding:12px}.topbar nav{gap:7px}}
 @media(prefers-reduced-motion:reduce){button,.search-field{transition:none}}
+
+/* Minimal monochrome visual direction. Blue is limited to the brand and primary actions. */
+:root{--background:#f7f7f6;--foreground:#171c25;--card:#fff;--border:#e2e3e5;--muted:#f3f3f2;--muted-foreground:#656c78;--primary:#2154d5;--secondary:#f2f3f5}
+body{background:#f7f7f6;color:#171c25}.brand{color:#151a23;font-weight:770;letter-spacing:-.055em}.brand-mark{display:block;width:34px;height:34px;flex:none;border-radius:9px;background:none;box-shadow:none;object-fit:contain}
+.topbar{background:#fff;border-bottom-color:#e9e9e8;box-shadow:none}.topbar nav{color:#606875}
+.workspace{max-width:1180px}.page-head h1{color:#171c25;letter-spacing:-.06em}.page-head .muted,.muted{color:#69717e}.eyebrow{color:#777f89;font-size:.71rem;letter-spacing:.16em}.entry-note,footer{color:#828b96}
+.panel{border-color:#e5e6e8;border-radius:16px;box-shadow:0 2px 14px rgba(18,28,45,.035)}.panel h2,.panel h3{color:#1c2430}.panel-head{border-bottom:1px solid #f0f0f1;padding-bottom:14px}.check-shell .panel-head,.detail-card .panel-head{border-bottom:0}
+.stat{background:#f7f7f7;border-color:#ededee;border-radius:11px}.stat strong{color:#1a2029}.stat span{color:#69717e}
+.button{border-radius:9px}.primary{background:#2154d5;border-color:#2154d5;box-shadow:none}.primary:not(:disabled):hover{background:#1945b4;border-color:#1945b4;box-shadow:0 4px 12px rgba(33,84,213,.14)}
+.outline{background:#fff;border-color:#d8dade;color:#29313d}.outline:not(:disabled):hover{background:#f5f5f5;border-color:#bfc4cb;color:#171c25}.danger{background:#fff;border-color:#e8cbcf;color:#aa3846}.danger:not(:disabled):hover{background:#fff5f5;border-color:#dca5ad;color:#912b39}
+.text-button{color:#313b4c}.text-button:hover{background:#f1f2f4}.student-link{color:#26364f}.student-link:hover{color:#2154d5}
+.field{color:#4c5563}.field input,.field select,.select-class{border-color:#d9dce0;box-shadow:none;color:#1c2532}.field input:hover,.field select:hover,.select-class:hover{border-color:#aeb3bc}.field input:focus,.field select:focus{border-color:#6e8fe6;outline:3px solid #e3eafd}
+.search-field{border-color:#dedfe2;background:#fff;color:#7a828e}.search-field:focus-within{border-color:#6e8fe6;box-shadow:0 0 0 3px #e3eafd}.search-count{color:#7d8590}
+.table-wrap{border-color:#e9e9eb}th{background:#f8f8f8;color:#737b86}th,td{border-bottom-color:#eeeeef}td{color:#394351}tbody tr:hover{background:#fafafa}td select{background:#fff;border-color:#dadddf;color:#384454}td select:hover{background:#f6f6f7;border-color:#bfc4cb}
+.micro-button{background:#f2f3f5;color:#425064}.micro-button:hover{background:#e9ebee;color:#1e2a3c}.micro-button.archive-link{background:#fff3f3;color:#a53a47}.micro-button.archive-link:hover{background:#ffe8e9;color:#8d2d39}
+.notice{background:#f4f6fa;border-color:#e6eaf0;color:#384658}.notice.success{background:#edf8f2;border-color:#d5edde;color:#21704d}.notice.error{background:#fff1f2;border-color:#f5d9de;color:#ad3344}.qr-box{border-color:#e2e3e5}.empty-state{background:#fafafa;border-color:#d8dadd}.archive-row{border-bottom-color:#ededee}
+.entry-shell{max-width:1150px}.entry-card{padding:85px 0}.entry-card h1{color:#171c25}.entry-actions{gap:10px}.check-shell .panel{box-shadow:0 4px 24px rgba(18,28,45,.04)}
