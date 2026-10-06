@@ -5,9 +5,9 @@ export async function POST(request: Request) {
     const data = await request.json() as Record<string, unknown>;
     const code = String(data.code || '').trim().toUpperCase(), roll = String(data.roll || '').trim(), pin = String(data.pin || ''), token = String(data.token || ''), sessionId = String(data.sessionId || '');
     if (!code || !roll || !/^\d{6}$/.test(pin) || !/^[a-f0-9]{64}$/.test(token) || !sessionId) return jsonError('Check the class code, roll number, PIN, and QR link.');
-    const klass = await db().prepare('SELECT id FROM classes WHERE code = ?').bind(code).first<{id:string}>();
+    const klass = await db().prepare('SELECT id FROM classes WHERE code = ? AND archived_at IS NULL').bind(code).first<{id:string}>();
     if (!klass) return jsonError('Class or student details could not be verified.',403);
-    const student = await db().prepare('SELECT id,pin_salt,pin_hash,failed_at,failed_count FROM students WHERE class_id = ? AND roll = ?').bind(klass.id,roll).first<{id:string,pin_salt:string,pin_hash:string,failed_at:number,failed_count:number}>();
+    const student = await db().prepare('SELECT id,pin_salt,pin_hash,failed_at,failed_count FROM students WHERE class_id = ? AND roll = ? AND archived_at IS NULL').bind(klass.id,roll).first<{id:string,pin_salt:string,pin_hash:string,failed_at:number,failed_count:number}>();
     if (!student) return jsonError('Class or student details could not be verified.',403);
     const now = Date.now();
     if (student.failed_count >= 5 && now - student.failed_at < 15*60000) return jsonError('Too many attempts. Ask your teacher to reset your PIN or wait 15 minutes.',429);
