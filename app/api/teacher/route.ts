@@ -6,33 +6,36 @@ export async function GET(request: Request) {
     if (!auth) return jsonError('Sign in to continue.', 401);
     const url = new URL(request.url);
     const selected = url.searchParams.get('classId');
-    const classes = (await db().prepare('SELECT id, name, code, timezone FROM classes ORDER BY created_at DESC').bind().all()).results;
+    const allClasses = (await db().prepare('SELECT id, name, code, timezone, archived_at FROM classes ORDER BY created_at DESC').bind().all()).results;
+    const classes = allClasses.filter(c => c.archived_at == null);
+    const archivedClasses = allClasses.filter(c => c.archived_at != null).map(c => ({id:c.id,name:c.name}));
     const studentId = url.searchParams.get('studentId');
     if (studentId) {
       const classId = String(selected || '');
       const klass = classes.find(c => c.id === classId);
       if (!klass) return jsonError('Class not found.', 404);
-      const student = await db().prepare('SELECT id, name, roll, created_at FROM students WHERE id = ? AND class_id = ?').bind(studentId, classId).first();
+      const student = await db().prepare('SELECT id, name, roll, created_at FROM students WHERE id = ? AND class_id = ? AND archived_at IS NULL').bind(studentId, classId).first();
       if (!student) return jsonError('Student not found.', 404);
       const history = (await db().prepare('SELECT s.date, a.status, a.method, a.checked_at, a.note FROM sessions s LEFT JOIN attendance a ON a.session_id = s.id AND a.student_id = ? WHERE s.class_id = ? AND s.ends_at >= ? ORDER BY s.date DESC').bind(studentId, classId, student.created_at).all()).results;
       return Response.json({ student, className: klass.name, history });
     }
     const activeClass = classes.find((c) => c.id === selected) || classes[0];
-    if (!activeClass) return Response.json({ teacher: auth.teacher, classes: [], students: [], session: null, attendance: [], invitations: [] });
+    if (!activeClass) return Response.json({ teacher: auth.teacher, classes: [], archivedClasses, students: [], archivedStudents: [], session: null, attendance: [], invitations: [] });
     const classId = String(activeClass.id);
     const today = localDate(String(activeClass.timezone));
     const requestedDate = url.searchParams.get('date');
     const date = requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) && requestedDate <= today ? requestedDate : today;
     const [studentRows, session, inviteRows] = await Promise.all([
-      db().prepare('SELECT id, name, roll, created_at FROM students WHERE class_id = ? ORDER BY roll').bind(classId).all(),
+      db().prepare('SELECT id, name, roll, created_at, archived_at FROM students WHERE class_id = ? ORDER BY roll').bind(classId).all(),
       db().prepare('SELECT id, starts_at, ends_at, closed_at, secret FROM sessions WHERE class_id = ? AND date = ?').bind(classId, date).first<{id:string,starts_at:number,ends_at:number,closed_at:number|null,secret:string}>(),
       db().prepare('SELECT email FROM invitations ORDER BY created_at DESC').bind().all(),
     ]);
     const attendance = session ? (await db().prepare('SELECT student_id, status, method, checked_at, note FROM attendance WHERE session_id = ?').bind(session.id).all()).results : [];
     const now = Date.now();
     const open = !!session && !session.closed_at && now < session.ends_at;
-    const visibleStudents = session ? studentRows.results.filter(s => Number(s.created_at) <= session.ends_at) : date === today ? studentRows.results : [];
-    return Response.json({ teacher: auth.teacher, classes, students: visibleStudents, session: session ? { id: session.id, date, startsAt: session.starts_at, endsAt: session.ends_at, closedAt: session.closed_at, open, token: open ? await qrToken(session.secret, slotNow()) : null } : null, attendance, invitations: inviteRows.results });
+    const archivedStudents = studentRows.results.filter(s => s.archived_at != null).map(s => ({id:s.id,name:s.name,roll:s.roll}));
+    const visibleStudents = session ? studentRows.results.filter(s => Number(s.created_at) <= session.ends_at && (s.archived_at == null || (date !== today && Number(s.archived_at) >= session.starts_at))) : date === today ? studentRows.results.filter(s => s.archived_at == null) : [];
+    return Response.json({ teacher: auth.teacher, classes, archivedClasses, students: visibleStudents, archivedStudents, session: session ? { id: session.id, date, startsAt: session.starts_at, endsAt: session.ends_at, closedAt: session.closed_at, open, token: open ? await qrToken(session.secret, slotNow()) : null } : null, attendance, invitations: inviteRows.results });
   } catch (error) { console.error('teacher GET', error); return jsonError('Attendance is temporarily unavailable. Please try again.', 503); }
 }
 
@@ -59,9 +62,30 @@ export async function POST(request: Request) {
       await db().prepare('INSERT INTO classes(id,teacher_id,name,code,timezone,created_at) VALUES(?,?,?,?,?,?)').bind(classId, auth.teacher.id, name, code, 'Asia/Kolkata', Date.now()).run();
       return Response.json({ ok: true, classId });
     }
+    if (action === 'restoreClass') {
+      const restoreId = String(data.classId || '');
+      const result = await db().prepare('UPDATE classes SET archived_at = NULL WHERE id = ? AND archived_at IS NOT NULL').bind(restoreId).run();
+      if (!result.meta.changes) return jsonError('Archived class not found.', 404);
+      return Response.json({ok:true,classId:restoreId});
+    }
     const classId = String(data.classId || '');
-    const klass = await db().prepare('SELECT id,timezone FROM classes WHERE id = ?').bind(classId).first<{id:string,timezone:string}>();
+    const klass = await db().prepare('SELECT id,timezone,archived_at FROM classes WHERE id = ?').bind(classId).first<{id:string,timezone:string,archived_at:number|null}>();
     if (!klass) return jsonError('Class not found.', 404);
+    if (action === 'archiveClass') {
+      if (klass.archived_at != null) return jsonError('Class is already archived.');
+      const now = Date.now();
+      await db().prepare('UPDATE classes SET archived_at = ? WHERE id = ? AND archived_at IS NULL').bind(now,classId).run();
+      await db().prepare('UPDATE sessions SET closed_at = ? WHERE class_id = ? AND closed_at IS NULL AND ends_at > ?').bind(now,classId,now).run();
+      return Response.json({ok:true});
+    }
+    if (klass.archived_at != null) return jsonError('Restore this class before editing it.', 409);
+    if (action === 'archiveStudent' || action === 'restoreStudent') {
+      const studentId = String(data.studentId || '');
+      const archived = action === 'archiveStudent';
+      const result = await db().prepare('UPDATE students SET archived_at = ? WHERE id = ? AND class_id = ? AND archived_at IS '+(archived?'NULL':'NOT NULL')).bind(archived?Date.now():null,studentId,classId).run();
+      if (!result.meta.changes) return jsonError('Student not found in the expected roster.',404);
+      return Response.json({ok:true});
+    }
     if (action === 'addStudent') {
       const name = String(data.name || '').trim().slice(0, 80), roll = String(data.roll || '').trim().slice(0, 30);
       if (!name || !roll) return jsonError('Name and roll number are required.');
@@ -73,7 +97,7 @@ export async function POST(request: Request) {
     }
     if (action === 'resetPin') {
       const studentId = String(data.studentId || '');
-      const student = await db().prepare('SELECT id,name,roll FROM students WHERE id = ? AND class_id = ?').bind(studentId, classId).first<{id:string,name:string,roll:string}>();
+      const student = await db().prepare('SELECT id,name,roll FROM students WHERE id = ? AND class_id = ? AND archived_at IS NULL').bind(studentId, classId).first<{id:string,name:string,roll:string}>();
       if (!student) return jsonError('Student not found.', 404);
       const pin = String(100000 + crypto.getRandomValues(new Uint32Array(1))[0] % 900000), salt = id();
       await db().prepare('UPDATE students SET pin_salt = ?, pin_hash = ?, failed_count = 0 WHERE id = ?').bind(salt, await pinHash(pin, salt), studentId).run();
@@ -97,7 +121,7 @@ export async function POST(request: Request) {
     if (action === 'manual') {
       const studentId = String(data.studentId || ''), status = String(data.status || ''), note = String(data.note || '').trim().slice(0,200);
       if (!['present','late','absent','excused'].includes(status) || !note) return jsonError('Choose a status and add a reason.');
-      const student = await db().prepare('SELECT id FROM students WHERE id = ? AND class_id = ?').bind(studentId,classId).first();
+      const student = await db().prepare('SELECT id FROM students WHERE id = ? AND class_id = ? AND archived_at IS NULL').bind(studentId,classId).first();
       if (!student) return jsonError('Student not found.',404);
       await db().prepare('INSERT INTO attendance(id,session_id,student_id,status,method,checked_at,note) VALUES(?,?,?,?,?,?,?) ON CONFLICT(session_id,student_id) DO UPDATE SET status=excluded.status,method=excluded.method,checked_at=excluded.checked_at,note=excluded.note').bind(id(),session.id,studentId,status,'manual',Date.now(),note).run();
       return Response.json({ok:true});
