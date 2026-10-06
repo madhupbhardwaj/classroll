@@ -7,6 +7,16 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const selected = url.searchParams.get('classId');
     const classes = (await db().prepare('SELECT id, name, code, timezone FROM classes ORDER BY created_at DESC').bind().all()).results;
+    const studentId = url.searchParams.get('studentId');
+    if (studentId) {
+      const classId = String(selected || '');
+      const klass = classes.find(c => c.id === classId);
+      if (!klass) return jsonError('Class not found.', 404);
+      const student = await db().prepare('SELECT id, name, roll, created_at FROM students WHERE id = ? AND class_id = ?').bind(studentId, classId).first();
+      if (!student) return jsonError('Student not found.', 404);
+      const history = (await db().prepare('SELECT s.date, a.status, a.method, a.checked_at, a.note FROM sessions s LEFT JOIN attendance a ON a.session_id = s.id AND a.student_id = ? WHERE s.class_id = ? AND s.ends_at >= ? ORDER BY s.date DESC').bind(studentId, classId, student.created_at).all()).results;
+      return Response.json({ student, className: klass.name, history });
+    }
     const activeClass = classes.find((c) => c.id === selected) || classes[0];
     if (!activeClass) return Response.json({ teacher: auth.teacher, classes: [], students: [], session: null, attendance: [], invitations: [] });
     const classId = String(activeClass.id);
