@@ -3,3 +3,5 @@
 
 .text-button{border:0;background:transparent;color:#315ec8;font-weight:700;padding:6px;cursor:pointer;text-align:left}.text-button:hover{text-decoration:underline}.check-shell .text-button{margin-top:18px}.check-shell form{margin-top:24px}
 .student-link{border:0;background:none;color:#2154d5;font-weight:700;padding:0;text-decoration:underline;text-underline-offset:3px}.student-link:hover{color:#153a9f}.detail-backdrop{position:fixed;inset:0;z-index:20;background:rgba(15,29,54,.52);display:flex;align-items:center;justify-content:center;padding:20px}.detail-card{width:min(800px,100%);max-height:90vh;overflow:auto}.detail-card h3{margin:28px 0 10px}
+
+.archive-link{background:none;border:0;color:#a82737;padding:0;text-decoration:underline}.archive-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #e7ecf5}.archive-row:last-child{border:0}
