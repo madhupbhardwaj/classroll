@@ -1,4 +1,4 @@
-import { currentTeacher, db, id, jsonError, localDate, pinHash, qrToken, randomCode, slotNow, secret, sha, sameOrigin } from '../../../lib/attendance';
+import { currentTeacher, db, id, jsonError, localDate, newStudentPin, pinHash, qrToken, randomCode, slotNow, secret, sha, sameOrigin } from '../../../lib/attendance';
 
 export async function GET(request: Request) {
   try {
@@ -93,9 +93,9 @@ export async function POST(request: Request) {
     if (action === 'addStudent') {
       const name = String(data.name || '').trim().slice(0, 80), roll = String(data.roll || '').trim().slice(0, 30), email=String(data.email||'').trim().toLowerCase();
       if (!name || !roll || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return jsonError('Name, roll number and student email are required.');
-      const pin = String(100000 + crypto.getRandomValues(new Uint32Array(1))[0] % 900000);
-      const salt = id();
-      try { await db().prepare('INSERT INTO students(id,class_id,name,roll,email,pin_salt,pin_hash,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(id(), classId, name, roll, email, salt, await pinHash(pin, salt), Date.now()).run(); }
+      const studentId=id();
+      const {pin,salt}=newStudentPin(studentId);
+      try { await db().prepare('INSERT INTO students(id,class_id,name,roll,email,pin_salt,pin_hash,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(studentId, classId, name, roll, email, salt, await pinHash(pin, salt), Date.now()).run(); }
       catch { return jsonError('That roll number or email is already in this class.'); }
       return Response.json({ ok: true, pin, name, roll });
     }
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
       const studentId = String(data.studentId || '');
       const student = await db().prepare('SELECT id,name,roll FROM students WHERE id = ? AND class_id = ? AND archived_at IS NULL').bind(studentId, classId).first<{id:string,name:string,roll:string}>();
       if (!student) return jsonError('Student not found.', 404);
-      const pin = String(100000 + crypto.getRandomValues(new Uint32Array(1))[0] % 900000), salt = id();
+      const {pin,salt}=newStudentPin(studentId);
       await db().prepare('UPDATE students SET pin_salt = ?, pin_hash = ?, failed_count = 0 WHERE id = ?').bind(salt, await pinHash(pin, salt), studentId).run();
       return Response.json({ ok: true, pin, name: student.name, roll: student.roll });
     }

@@ -1,6 +1,6 @@
 import { db } from './db';
 import { cookies } from 'next/headers';
-import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, randomInt, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 const scrypt = promisify(scryptCallback);
 export { db };
@@ -15,6 +15,27 @@ export const slotNow=()=>Math.floor(Date.now()/30000);
 export async function passwordHash(password:string,salt:string){return (await scrypt(password,salt,64) as Buffer).toString('hex')}
 export function safeEqualHex(a:string,b:string){if(a.length!==b.length)return false;return timingSafeEqual(Buffer.from(a,'hex'),Buffer.from(b,'hex'))}
 export function secret(){return randomBytes(32).toString('hex')}
+function pinDisplayKey(){
+ const value=process.env.PIN_DISPLAY_KEY;
+ if(!value)return null;
+ if(!/^[a-fA-F0-9]{64}$/.test(value))throw new Error('PIN_DISPLAY_KEY must be 64 hexadecimal characters.');
+ return Buffer.from(value,'hex');
+}
+export function viewablePin(studentId:string,salt:string){
+ if(!salt.startsWith('v2:'))return null;
+ const key=pinDisplayKey();if(!key)return null;
+ const digest=createHmac('sha256',key).update('classroll-student-pin-v2\0').update(studentId).update('\0').update(salt).digest();
+ return String(100000+digest.readUInt32BE(0)%900000);
+}
+export function newStudentPin(studentId:string,viewableRequired=false){
+ const key=pinDisplayKey();
+ if(!key){
+  if(viewableRequired)throw new Error('PIN viewing is not configured.');
+  return {pin:String(randomInt(100000,1000000)),salt:id()};
+ }
+ const salt='v2:'+id();
+ return {pin:viewablePin(studentId,salt)!,salt};
+}
 export async function getTeacher(){const token=(await cookies()).get('classroll_session')?.value;if(!token)return null;const teacher=await db().prepare('SELECT t.id,t.email,t.name FROM teachers t JOIN teacher_sessions s ON s.teacher_id=t.id WHERE s.token_hash=? AND s.expires_at>?').bind(await sha(token),Date.now()).first<{id:string,email:string,name:string}>();return teacher}
 export async function currentTeacher(){const teacher=await getTeacher();return teacher?{teacher}:null}
 export async function createSession(teacherId:string){const token=secret();await db().prepare('INSERT INTO teacher_sessions(token_hash,teacher_id,expires_at) VALUES(?,?,?)').bind(await sha(token),teacherId,Date.now()+30*86400000).run();(await cookies()).set('classroll_session',token,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/',maxAge:30*86400})}

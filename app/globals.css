@@ -90,3 +90,11 @@ body{background:#f7f7f6;color:#171c25}.brand{color:#151a23;font-weight:770;lette
 .task-layout .mark-button{flex:none;display:inline-grid;place-items:center}
 .task-card>div{min-width:0;overflow-wrap:anywhere}
 @media(max-width:600px){.task-layout>.panel>.panel-head .row{max-width:none}.task-layout>.panel>.panel-head .row .button{font-size:.78rem;padding-inline:5px}}
+
+/* Student PIN is hidden until the eye button is continuously held. */
+.student-pin-panel .panel-head{margin-bottom:16px}.student-pin-panel .eyebrow{margin:0 0 7px}
+.pin-reveal-row{display:flex;align-items:stretch;gap:12px;max-width:450px;margin:18px 0 12px}
+.pin-mask{display:flex;align-items:center;justify-content:center;flex:1;min-width:0;min-height:50px;border:1px solid #d9dce2;border-radius:10px;background:#f8f9fb;color:#1d2a40;font-size:1.45rem;font-weight:750;letter-spacing:.22em;user-select:none}
+.pin-eye{min-width:148px;touch-action:none;user-select:none}.pin-eye[aria-pressed="true"]{border-color:#2154d5;background:#eef3ff;color:#1945b4}
+.student-pin-panel .tiny{margin-bottom:0}.student-pin-panel .notice{margin-top:16px}
+@media(max-width:470px){.pin-reveal-row{flex-wrap:wrap}.pin-mask,.pin-eye{width:100%;flex:auto}}
