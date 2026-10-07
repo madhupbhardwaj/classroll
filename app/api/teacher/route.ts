@@ -34,7 +34,11 @@ export async function GET(request: Request) {
     const now = Date.now();
     const open = !!session && !session.closed_at && now < session.ends_at;
     const archivedStudents = studentRows.results.filter(s => s.archived_at != null).map(s => ({id:s.id,name:s.name,roll:s.roll}));
-    const visibleStudents = session ? studentRows.results.filter(s => Number(s.created_at) <= session.ends_at && (s.archived_at == null || (date !== today && Number(s.archived_at) >= session.starts_at))) : date === today ? studentRows.results.filter(s => s.archived_at == null) : [];
+    const visibleStudents = date === today
+      ? studentRows.results.filter(s => s.archived_at == null)
+      : session
+        ? studentRows.results.filter(s => Number(s.created_at) <= session.ends_at && (s.archived_at == null || Number(s.archived_at) >= session.starts_at))
+        : [];
     return Response.json({ teacher: auth.teacher, classes, archivedClasses, students: visibleStudents, archivedStudents, session: session ? { id: session.id, date, startsAt: session.starts_at, endsAt: session.ends_at, closedAt: session.closed_at, open, token: open ? await qrToken(session.secret, slotNow()) : null } : null, attendance, invitations: inviteRows.results });
   } catch (error) { console.error('teacher GET', error); return jsonError('Attendance is temporarily unavailable. Please try again.', 503); }
 }
