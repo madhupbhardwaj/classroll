@@ -85,6 +85,7 @@ body{background:#f7f7f6;color:#171c25}.brand{color:#151a23;font-weight:770;lette
 
 /* Keep the new portal controls aligned with the attendance workspace. */
 .student-auth form>.button,.student-layout form .button,.task-sidebar form .button{width:100%}
+.google-auth h2{margin:0 0 8px}.google-auth .g_id_signin{min-height:44px;display:flex;align-items:center;margin:22px 0}.google-auth .field-hint{display:block;line-height:1.55}
 .task-layout>.panel>.panel-head .row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;max-width:370px}
 .task-layout>.panel>.panel-head .row .button{width:100%;min-width:0;padding-inline:9px;white-space:nowrap}
 .task-layout .mark-button{flex:none;display:inline-grid;place-items:center}

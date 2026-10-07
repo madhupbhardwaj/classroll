@@ -44,8 +44,7 @@ ALTER TABLE students ADD COLUMN IF NOT EXISTS account_id TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_students_class_email ON students(class_id, email) WHERE email IS NOT NULL;
 CREATE TABLE IF NOT EXISTS student_accounts (
  id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
- password_salt TEXT NOT NULL, password_hash TEXT NOT NULL,
- failed_at BIGINT NOT NULL DEFAULT 0, failed_count INTEGER NOT NULL DEFAULT 0,
+ google_sub TEXT NOT NULL UNIQUE,
  created_at BIGINT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS student_sessions (
