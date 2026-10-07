@@ -6,7 +6,7 @@ export async function GET(request: Request) {
     if (!auth) return jsonError('Sign in to continue.', 401);
     const url = new URL(request.url);
     const selected = url.searchParams.get('classId');
-    const allClasses = (await db().prepare('SELECT id, name, code, timezone, archived_at FROM classes ORDER BY created_at DESC').bind().all()).results;
+    const allClasses = (await db().prepare('SELECT id, name, code, timezone, archived_at FROM classes WHERE teacher_id = ? ORDER BY created_at DESC').bind(auth.teacher.id).all()).results;
     const classes = allClasses.filter(c => c.archived_at == null);
     const archivedClasses = allClasses.filter(c => c.archived_at != null).map(c => ({id:c.id,name:c.name}));
     const studentId = url.searchParams.get('studentId');
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       const classId = String(selected || '');
       const klass = classes.find(c => c.id === classId);
       if (!klass) return jsonError('Class not found.', 404);
-      const student = await db().prepare('SELECT id, name, roll, created_at FROM students WHERE id = ? AND class_id = ? AND archived_at IS NULL').bind(studentId, classId).first();
+      const student = await db().prepare('SELECT id, name, roll, email, created_at FROM students WHERE id = ? AND class_id = ? AND archived_at IS NULL').bind(studentId, classId).first();
       if (!student) return jsonError('Student not found.', 404);
       const history = (await db().prepare('SELECT s.date, a.status, a.method, a.checked_at, a.note FROM sessions s LEFT JOIN attendance a ON a.session_id = s.id AND a.student_id = ? WHERE s.class_id = ? AND s.ends_at >= ? ORDER BY s.date DESC').bind(studentId, classId, student.created_at).all()).results;
       return Response.json({ student, className: klass.name, history });
@@ -26,9 +26,9 @@ export async function GET(request: Request) {
     const requestedDate = url.searchParams.get('date');
     const date = requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) && requestedDate <= today ? requestedDate : today;
     const [studentRows, session, inviteRows] = await Promise.all([
-      db().prepare('SELECT id, name, roll, created_at, archived_at FROM students WHERE class_id = ? ORDER BY roll').bind(classId).all(),
+      db().prepare('SELECT id, name, roll, email, account_id, created_at, archived_at FROM students WHERE class_id = ? ORDER BY roll').bind(classId).all(),
       db().prepare('SELECT id, starts_at, ends_at, closed_at, secret FROM sessions WHERE class_id = ? AND date = ?').bind(classId, date).first<{id:string,starts_at:number,ends_at:number,closed_at:number|null,secret:string}>(),
-      db().prepare('SELECT email FROM invitations ORDER BY created_at DESC').bind().all(),
+      db().prepare('SELECT email FROM invitations WHERE invited_by = ? ORDER BY created_at DESC').bind(auth.teacher.id).all(),
     ]);
     const attendance = session ? (await db().prepare('SELECT student_id, status, method, checked_at, note FROM attendance WHERE session_id = ?').bind(session.id).all()).results : [];
     const now = Date.now();
@@ -64,12 +64,12 @@ export async function POST(request: Request) {
     }
     if (action === 'restoreClass') {
       const restoreId = String(data.classId || '');
-      const result = await db().prepare('UPDATE classes SET archived_at = NULL WHERE id = ? AND archived_at IS NOT NULL').bind(restoreId).run();
+      const result = await db().prepare('UPDATE classes SET archived_at = NULL WHERE id = ? AND teacher_id = ? AND archived_at IS NOT NULL').bind(restoreId,auth.teacher.id).run();
       if (!result.meta.changes) return jsonError('Archived class not found.', 404);
       return Response.json({ok:true,classId:restoreId});
     }
     const classId = String(data.classId || '');
-    const klass = await db().prepare('SELECT id,timezone,archived_at FROM classes WHERE id = ?').bind(classId).first<{id:string,timezone:string,archived_at:number|null}>();
+    const klass = await db().prepare('SELECT id,timezone,archived_at FROM classes WHERE id = ? AND teacher_id = ?').bind(classId,auth.teacher.id).first<{id:string,timezone:string,archived_at:number|null}>();
     if (!klass) return jsonError('Class not found.', 404);
     if (action === 'archiveClass') {
       if (klass.archived_at != null) return jsonError('Class is already archived.');
@@ -87,13 +87,23 @@ export async function POST(request: Request) {
       return Response.json({ok:true});
     }
     if (action === 'addStudent') {
-      const name = String(data.name || '').trim().slice(0, 80), roll = String(data.roll || '').trim().slice(0, 30);
-      if (!name || !roll) return jsonError('Name and roll number are required.');
+      const name = String(data.name || '').trim().slice(0, 80), roll = String(data.roll || '').trim().slice(0, 30), email=String(data.email||'').trim().toLowerCase();
+      if (!name || !roll || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return jsonError('Name, roll number and student email are required.');
       const pin = String(100000 + crypto.getRandomValues(new Uint32Array(1))[0] % 900000);
       const salt = id();
-      try { await db().prepare('INSERT INTO students(id,class_id,name,roll,pin_salt,pin_hash,created_at) VALUES(?,?,?,?,?,?,?)').bind(id(), classId, name, roll, salt, await pinHash(pin, salt), Date.now()).run(); }
-      catch { return jsonError('That roll number is already in the class.'); }
+      try { await db().prepare('INSERT INTO students(id,class_id,name,roll,email,pin_salt,pin_hash,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(id(), classId, name, roll, email, salt, await pinHash(pin, salt), Date.now()).run(); }
+      catch { return jsonError('That roll number or email is already in this class.'); }
       return Response.json({ ok: true, pin, name, roll });
+    }
+    if (action === 'setStudentEmail') {
+      const studentId=String(data.studentId||''),email=String(data.email||'').trim().toLowerCase();
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return jsonError('Enter a valid student email.');
+      const current=await db().prepare('SELECT email FROM students WHERE id = ? AND class_id = ? AND archived_at IS NULL').bind(studentId,classId).first<{email:string|null}>();
+      if(!current)return jsonError('Student not found.',404);
+      if(current.email===email)return Response.json({ok:true});
+      try {const result=await db().prepare('UPDATE students SET email = ?, account_id = NULL WHERE id = ? AND class_id = ? AND archived_at IS NULL').bind(email,studentId,classId).run();if(!result.meta.changes)return jsonError('Student not found.',404)}
+      catch{return jsonError('This email is already assigned in the class.');}
+      return Response.json({ok:true});
     }
     if (action === 'resetPin') {
       const studentId = String(data.studentId || '');

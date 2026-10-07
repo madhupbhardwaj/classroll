@@ -9,7 +9,7 @@ A student–teacher attendance portal for Vercel. Teachers create classes, displ
 3. Add a Postgres database. In the Vercel dashboard, open **Storage / Marketplace** and connect **Neon** to this project. Copy its **pooled** Postgres connection string into the project’s `DATABASE_URL` environment variable if the integration has not already created that exact variable. Set it for Production, and for Preview too if you want preview deployments to work. Do not expose the URL with a `NEXT_PUBLIC_` prefix.
 4. Set `TEACHER_SETUP_CODE` as a Production environment variable. Generate a long random value, for example `openssl rand -hex 24` in Terminal. Save it privately; the first teacher needs it once. Do not put it in source code or `.env.example`.
 5. In the Neon SQL Editor, run the full contents of [`db/schema.sql`](db/schema.sql). It creates the tables and indexes. Alternatively, locally set `DATABASE_URL` in `.env.local`, load that variable into your shell, and run `npm run db:migrate`.
-6. Redeploy in Vercel after setting the environment variables. Open `/teacher`, choose **Create an account**, and enter the setup code. The first teacher can invite additional teachers; the app shows a one-time invitation code to share privately. Students use `/check-in` through the QR link and do not need accounts.
+6. Redeploy in Vercel after setting the environment variables. Open `/teacher`, choose **Create an account**, and enter the setup code. The first teacher can invite additional teachers; the app shows a one-time invitation code to share privately. Students use `/check-in` through the QR link. They can also create an account at `/student` to view their own classes, tasks and attendance.
 
 Vercel automatically deploys future pushes to the linked GitHub branch. The earlier ChatGPT-hosted site uses a separate database; records from it do not automatically appear in this installation.
 
@@ -36,7 +36,15 @@ A student who shares both a live QR link and their PIN can still ask someone els
 
 ## Limits and operations
 
-The first installation starts with an empty roster. Back up the Neon database according to your school’s retention policy. Anyone with the public Vercel URL can see the student check-in form, while teacher actions require a teacher account. Only invite trusted teachers: every teacher currently has access to all classes in this installation.
+The first installation starts with an empty roster. Back up the Neon database according to your school’s retention policy. Anyone with the public Vercel URL can see the student check-in form, while teacher actions require a teacher account. Each teacher can access only classes they created.
+
+## Student accounts and class tasks
+
+For an existing deployment, run `db/student-tasks-migration.sql` in the Neon SQL Editor **before** uploading the updated application files. For a fresh deployment, use the full `db/schema.sql` instead. The migration preserves existing attendance records.
+
+Teachers now see only classes created by their own account. From `/teacher/tasks` they can create tasks with a name, due date and optional description, edit or delete them, mark each student submitted/not submitted/unmarked, search the roster, see counts and export a task CSV. Deleting a task permanently deletes its submission marks.
+
+Students create an email/password account at `/student`. A teacher adds that exact email when creating a student roster entry, or sets an email on an existing student's profile. The student then joins from their portal using the class code, roll number and their existing private PIN. This claim step protects their tasks and attendance even if someone else registered with the same email. A student can link multiple classes to one account. New students automatically appear unmarked on all tasks in their class. The student portal is read-only for task marks and attendance.
 
 ## Archive update for an existing database
 
